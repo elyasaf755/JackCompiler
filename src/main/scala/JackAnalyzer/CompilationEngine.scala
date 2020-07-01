@@ -1,7 +1,15 @@
 package Modules.JackAnalyzerClasses
 
-import java.io.FileWriter
+import java.io.{File, FileWriter}
+
+import JackAnalyzer.VarKind.VarKind
+import JackAnalyzer.{SymbolTable, VarKind}
+import Models.{Argument, Identifier}
+import Modules.JackAnalyzerClasses.LabelKind.LabelKind
 import Tools.Util
+
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 class CompilationEngine {
 
@@ -9,7 +17,24 @@ class CompilationEngine {
 
   private var _tokenizer:JackTokenizer = _
   private var _outputFileUrl:String = _
-  private var _tabsCount = 0
+  private var _currentIndentLevel = 0
+  private var _symbolTable = new SymbolTable()
+
+  private var _outputFileName:String = _
+  private var _isXml = false
+  private var _kindMap = Map(
+    "static" -> VarKind.STATIC,
+    "field" -> VarKind.FIELD,
+  )
+  private val _labelsCount:mutable.HashMap[LabelKind, Int] = mutable.HashMap(
+    LabelKind.IF_TRUE -> 0,
+    LabelKind.IF_FALSE -> 0,
+    LabelKind.IF_END -> 0,
+    LabelKind.WHILE_EXP -> 0,
+    LabelKind.WHILE_END -> 0,
+  )
+
+  private var _cmdsCount = 0
 
 
   /* Constructor */
@@ -22,12 +47,16 @@ class CompilationEngine {
 
     _tokenizer = tokenizer
     _outputFileUrl = outputFileUrl
+
+    val f = new File(_outputFileUrl)
+    _outputFileName = f.getName.replace(".jack", "")
+                               .replace(".vm", "")
   }
 
 
   /* Compile Methods */
 
-  /*
+  /* DONE
    * Compiles a complete class.
    * "class" className '{' classVarDec* subroutineDec* '}'
    */
@@ -70,10 +99,10 @@ class CompilationEngine {
 
         writeClosingTag(tag)
       }
-    }//end of first "if" statement
+    }
   }
 
-  /*
+  /* DONE
    * Compiles a static variable declaration, or a field deceleration.
    * ("static" | "field") type varName(',' varName)* ';'
    */
@@ -89,14 +118,21 @@ class CompilationEngine {
         val tag = "classVarDec"
         writeOpeningTag(tag)
 
+        //*EDIT
+        var varKind = _kindMap(_tokenizer.keyword())
         eatCurrentToken()
 
         // type
         if (isType(_tokenizer.getCurrentToken())){
+          //*EDIT
+          var varType = _tokenizer.getCurrentTokenValue()
           eatCurrentToken()
 
           // varName
           if (isIdentifier(_tokenizer.getCurrentToken())) {
+            //*EDIT
+            var varName = _tokenizer.identifier()
+            _symbolTable.define(varName, varType, varKind)
             eatCurrentToken()
 
             // (',' varName)*
@@ -105,6 +141,9 @@ class CompilationEngine {
 
               // varName
               if (isIdentifier(_tokenizer.getCurrentToken())){
+                //*EDIT
+                varName = _tokenizer.identifier()
+                _symbolTable.define(varName, varType, varKind)
                 eatCurrentToken()// eat varName
               }
             }
@@ -127,7 +166,7 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles a complete method, function, or constructor.
    * ("constructor" | "function" | "method")("void" | type) subroutineName
    * '(' parameterList ')' subroutineBody
@@ -143,33 +182,54 @@ class CompilationEngine {
         val tag = "subroutineDec"
         writeOpeningTag(tag)
 
+        //*EDIT
+        val subKind = _tokenizer.getCurrentTokenValue()
+        resetSubroutine()
+
         eatCurrentToken()
 
         // ("void" | type)
         if (isKeywordEqual(_tokenizer.getCurrentToken(), "void") || isType(_tokenizer.getCurrentToken())){
+
+          //*EDIT
+          val returnType = _tokenizer.getCurrentTokenValue()
+
           eatCurrentToken()
 
           // subroutineName
           if (isIdentifier(_tokenizer.getCurrentToken())){
+            //*EDIT
+            val subName = _tokenizer.identifier()
+
             eatCurrentToken()
 
             // '('
             if (isSymbolEqual(_tokenizer.getCurrentToken(), "(")){
               eatCurrentToken()
 
+              if (subKind == "method"){
+                _symbolTable.define("this", _outputFileName, VarKind.ARG)
+              }
+
               // parameterList
-              if (compileParameterList()){
+              compileParameterList()
 
-                // ')'
-                if (isSymbolEqual(_tokenizer.getCurrentToken(), ")")){
-                  eatCurrentToken()
+              //*EDIT
+              val paramsCount = _symbolTable.getVarCount(VarKind.ARG)
 
-                  // subroutineBody
-                  if (compileSubroutineBody()){
-                    writeClosingTag(tag)
+              // ')'
+              if (isSymbolEqual(_tokenizer.getCurrentToken(), ")")){
 
-                    return true
-                  }
+                //*EDIT
+                val fullSubName = generateFullSubName(subName)
+
+                eatCurrentToken()
+
+                // subroutineBody
+                if (compileSubroutineBody(subKind, fullSubName)){
+                  writeClosingTag(tag)
+
+                  return true
                 }
               }
             }
@@ -183,21 +243,28 @@ class CompilationEngine {
     return false;
   }
 
-  /*
+  /* DONE
    * Compiles a (possibly empty) parameter list.
    * Doesn't handle the enclosing "()".
    * ((type varName) (',' type varName)*)?
    */
-  def compileParameterList():Boolean ={
+  def compileParameterList():Unit ={
     val tag = "parameterList"
     writeOpeningTag(tag)
 
     // type
     if (isType(_tokenizer.getCurrentToken())){
+      //*EDIT
+      var varType = _tokenizer.getCurrentToken().tokenValue
+
       eatCurrentToken()
 
       // varName
       if (isIdentifier(_tokenizer.getCurrentToken())){
+        //*EDIT
+        var varName = _tokenizer.getCurrentToken().tokenValue
+        _symbolTable.define(varName, varType, VarKind.ARG)
+
         eatCurrentToken()
 
         // (',' type varName)*
@@ -206,10 +273,17 @@ class CompilationEngine {
 
           // type
           if (isType(_tokenizer.getCurrentToken())){
+            //*EDIT
+            var varType = _tokenizer.getCurrentToken().tokenValue
+
             eatCurrentToken()
 
             // varName
             if (isIdentifier(_tokenizer.getCurrentToken())){
+              //*EDIT
+              var varName = _tokenizer.getCurrentToken().tokenValue
+              _symbolTable.define(varName, varType, VarKind.ARG)
+
               eatCurrentToken()
             }
             else{
@@ -225,16 +299,14 @@ class CompilationEngine {
     }
 
     writeClosingTag(tag)
-
-    return true
   }
 
-  /*
+  /* DONE
    * Compiles a subroutine's body
    * '{' varDec* statements '}'
    */
-  def compileSubroutineBody():Boolean ={
-    if (_tokenizer.hasMoreTokens()){
+  def compileSubroutineBody(subKind:String, fullSubName:String):Boolean ={
+    if (_tokenizer.hasMoreTokens()){//TODO:Del this "if" statement?
 
       // '{'
       if (isSymbolEqual(_tokenizer.getCurrentToken(), "{")){
@@ -245,6 +317,23 @@ class CompilationEngine {
 
         // varDec*
         while (compileVarDec()){}
+
+        //*EDIT
+        val varsCount = _symbolTable.getVarCount(VarKind.VAR)
+
+        //*EDIT
+        writeVmCommand("function " + fullSubName + " " + varsCount)
+        if (subKind == "constructor"){
+          val fieldsCount = _symbolTable.getVarCount(VarKind.FIELD)
+          writePushConst(fieldsCount)
+          writeVmCommand("call Memory.alloc 1")
+          writeVmCommand("pop pointer 0")
+        }
+        else if (subKind == "method"){
+          writePush("this")
+          writeVmCommand("pop pointer 0")
+        }
+
 
         // statements
         if (compileStatements()){
@@ -266,12 +355,12 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles a var declaration.
    * "var" type varName (',' varName)* ';'
    */
   def compileVarDec():Boolean ={
-    if (_tokenizer.hasMoreTokens()){
+    if (_tokenizer.hasMoreTokens()){//TODO: Del this "if" statement?
 
       // "var"
       if (_tokenizer.tokenType() == TokenType.KEYWORD &&
@@ -284,10 +373,15 @@ class CompilationEngine {
 
         // type
         if (isType(_tokenizer.getCurrentToken())){
+          //*EDIT
+          var varType = _tokenizer.getCurrentTokenValue()
           eatCurrentToken()
 
           // varName
           if (isIdentifier(_tokenizer.getCurrentToken())){
+            //*EDIT
+            var varName = _tokenizer.getCurrentTokenValue()
+            _symbolTable.define(varName, varType, VarKind.VAR)
             eatCurrentToken()
 
             // (',' varName)*
@@ -296,6 +390,9 @@ class CompilationEngine {
 
               // varName
               if (isIdentifier(_tokenizer.getCurrentToken())){
+                //*EDIT
+                varName = _tokenizer.getCurrentTokenValue()
+                _symbolTable.define(varName, varType, VarKind.VAR)
                 eatCurrentToken()
               }
             }
@@ -318,7 +415,7 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles a sequence of statements.
    * Doesn't handle the enclosing "{}"
    */
@@ -338,7 +435,7 @@ class CompilationEngine {
    * "let" varName ('['expression']')? '=' expression ';'
    */
   def compileLet():Boolean ={
-    if (_tokenizer.hasMoreTokens()){
+    if (_tokenizer.hasMoreTokens()){//TODO:Delete this "if" statement?
 
       // "let"
       if (isKeywordEqual(_tokenizer.getCurrentToken(), "let")){
@@ -350,6 +447,10 @@ class CompilationEngine {
 
         // varName
         if (isIdentifier(_tokenizer.getCurrentToken())){
+          //*EDIT
+          val varName = _tokenizer.getCurrentTokenValue()
+          var isAssignArr = false
+
           eatCurrentToken()
 
           //('[' expression ']')?
@@ -361,6 +462,11 @@ class CompilationEngine {
 
               // ']'
               if (isSymbolEqual(_tokenizer.getCurrentToken() ,"]")){
+                //*EDIT
+                writePush(varName)
+                writeAdd()
+                isAssignArr = true
+
                 eatCurrentToken()
               }
               else{
@@ -379,8 +485,19 @@ class CompilationEngine {
             // expression
             if (compileExpression()){
 
-              // ','
+              // ';'
               if (isSymbolEqual(_tokenizer.getCurrentToken(), ";")){
+                //*EDIT
+                if (isAssignArr){
+                  writeVmCommand("pop temp 0") // save in temp
+                  writeVmCommand("pop pointer 1") // pop THAT
+                  writeVmCommand("push temp 0")
+                  writeVmCommand("pop that 0")
+                }
+                else{
+                  val command = "pop " + _symbolTable.kindOf(varName).toString + " " + _symbolTable.indexOf(varName).toString
+                  writeVmCommand(command)
+                }
                 eatCurrentToken()
 
                 writeClosingTag(tag)
@@ -398,7 +515,7 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles an if statement, possibly with a trailing else clause
    * 'if' '(' expression ')' '{' statements '}' ("else" '{' statements '}')?
    */
@@ -422,6 +539,19 @@ class CompilationEngine {
 
             // ')'
             if (isSymbolEqual(_tokenizer.getCurrentToken(), ")")){
+
+              //region *EDIT
+
+              val ifTrueLabel = generateLabel(LabelKind.IF_TRUE)
+              val ifFalseLabel = generateLabel(LabelKind.IF_FALSE)
+              val ifEndLabel = generateLabel(LabelKind.IF_END)
+              //can also be implemented by "not" and then "if-goto IF_TRUE"
+              writeVmCommand("if-goto " + ifTrueLabel) // if-goto L1
+              writeVmCommand("goto " + ifFalseLabel)
+              writeLabel(ifTrueLabel)
+
+              //endregion
+
               eatCurrentToken()
 
               // '{'
@@ -437,6 +567,9 @@ class CompilationEngine {
 
                     // ("else" '{' statements '}')?
                     if (isKeywordEqual(_tokenizer.getCurrentToken(), "else")){
+                      //*EDIT
+                      writeVmCommand("goto " + ifEndLabel)
+                      writeLabel(ifFalseLabel)
                       eatCurrentToken()
 
                       // '{'
@@ -448,6 +581,8 @@ class CompilationEngine {
 
                           // '}'
                           if (isSymbolEqual(_tokenizer.getCurrentToken(), "}")){
+                            //*EDIT
+                            writeLabel(ifEndLabel)
                             eatCurrentToken()
 
                             writeClosingTag(tag)
@@ -456,6 +591,7 @@ class CompilationEngine {
                           }
                           else{
                             writeClosingTag(tag) // TODO: throw? expected '}'
+
                             return false
                           }
                         }
@@ -472,6 +608,9 @@ class CompilationEngine {
                       }
                     }
                     else{
+                      //*EDIT
+                      writeLabel(ifFalseLabel)
+
                       writeClosingTag(tag)
 
                       return true
@@ -490,7 +629,7 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles a while statement.
    * "while" '(' expression ')' '{' statements '}'
    */
@@ -502,6 +641,10 @@ class CompilationEngine {
         val tag = "whileStatement"
         writeOpeningTag(tag)
 
+        //*EDIT
+        val whileLabel = generateLabel(LabelKind.WHILE_EXP)
+        val whileEndLabel = generateLabel(LabelKind.WHILE_END)
+        writeLabel(whileLabel) // label L1
         eatCurrentToken()
 
         if (isSymbolEqual(_tokenizer.getCurrentToken(), "(")){
@@ -512,6 +655,9 @@ class CompilationEngine {
 
             // ')'
             if (isSymbolEqual(_tokenizer.getCurrentToken(), ")")){
+              //*EDIT
+              writeVmCommand("not") // not
+              writeVmCommand("if-goto " + whileEndLabel) // if-goto L2
               eatCurrentToken()
 
               // '{'
@@ -523,6 +669,9 @@ class CompilationEngine {
 
                   // '}'
                   if (isSymbolEqual(_tokenizer.getCurrentToken(), "}")){
+                    //*EDIT
+                    writeVmCommand("goto " + whileLabel) // goto L1
+                    writeLabel(whileEndLabel) // label L2
                     eatCurrentToken()
 
                     writeClosingTag(tag)
@@ -542,12 +691,12 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles a do statement
    * "do" subroutineCall ';'
    */
   def compileDo():Boolean ={
-    if (_tokenizer.hasMoreTokens()){
+    if (_tokenizer.hasMoreTokens()){//TODO: delete this "if" statement?
 
       // "do"
       if (isKeywordEqual(_tokenizer.getCurrentToken(), "do")){
@@ -563,6 +712,9 @@ class CompilationEngine {
           if (isSymbolEqual(_tokenizer.getCurrentToken(), ";")){
             eatCurrentToken()
 
+            //*EDIT
+            writeVmCommand("pop temp 0")
+
             writeClosingTag(tag)
 
             return true
@@ -576,7 +728,7 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles a return statement.
    * "return" expression? ';'
    */
@@ -591,10 +743,18 @@ class CompilationEngine {
         eatCurrentToken()
 
         // expression?
-        compileExpression()
+        if (!compileExpression()){
+          writePushConst(0)
+        }
 
         // ';'
         if (isSymbolEqual(_tokenizer.getCurrentToken(), ";")){
+          //region *EDIT
+
+          writeVmCommand("return") // return
+
+          //endregion
+
           eatCurrentToken()
 
           writeClosingTag(tag)
@@ -609,7 +769,7 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles an expression
    * term (op term)*
    */
@@ -624,7 +784,10 @@ class CompilationEngine {
       if (compileTerm()){
 
         // (op term)*
+        //region while (isOp(_tokenizer.getCurrentToken())){...}
         while (isOp(_tokenizer.getCurrentToken())){
+          //*EDIT
+          val op = _tokenizer.getCurrentTokenValue()
           eatCurrentToken()
 
           // term
@@ -634,7 +797,11 @@ class CompilationEngine {
             // TODO: throw? expected term
             return false
           }
+
+          //*EDIT
+          writeVmCommand(getVmOpCommand(op))
         }
+        //endregion
 
         writeClosingTag(tag)
 
@@ -651,7 +818,7 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles a term.
    * If the current token is an IDENTIFIER,
    * the routine must distinguish between a variable, an array entry, or a subroutine call.
@@ -668,9 +835,42 @@ class CompilationEngine {
     val currentToken = _tokenizer.getCurrentToken()
     val nextToken = _tokenizer.getNextToken()
 
-    /*    integerConstant | stringConstant | keywordConstant    */
+    /*    integerConstant | stringConstant | keywordConstant    */ //DONE
     if (isIntConst(currentToken) || isStringConst(currentToken) || isKeywordConst(currentToken)){
       writeOpeningTag(tag)
+
+      //region *EDIT
+
+      val currTokValue = currentToken.tokenValue
+      //number
+      if (isIntConst(currentToken)){
+        writePushConst(currTokValue)
+      }
+      else if (isKeywordConst(currentToken)){
+        if (currTokValue == "null" || currTokValue == "false"){
+          writePushConst(0)
+        }
+        else if (currTokValue == "true"){
+          // can also be implemented by "push 1" and then "neg"
+          writePushConst(0)
+          writeVmCommand("not")
+        }
+        else if (currTokValue == "this"){
+          writeVmCommand("push pointer 0")
+        }
+      }
+      else if (isStringConst(currentToken)){
+        val str = currTokValue
+
+        writePushConst(str.length)
+        writeVmCommand("call String.new 1")
+
+        str.foreach(c => {
+          writePushConst(c.toInt)
+          writeVmCommand("call String.appendChar 2")
+        })
+      }
+      //endregion
 
       eatCurrentToken()
 
@@ -678,9 +878,12 @@ class CompilationEngine {
 
       return true
     }
-    /*    varName'['expression']' <=> identifier'[' etc...    */
+    /*    varName'['expression']' <=> identifier'[' etc...    */ //DONE
     else if (isIdentifier(currentToken) && isSymbolEqual(nextToken, "[")){
       writeOpeningTag(tag)
+
+      //*EDIT
+      val varName = currentToken.tokenValue
 
       eatCurrentToken() // eat varName
       eatCurrentToken() // eat '['
@@ -690,6 +893,12 @@ class CompilationEngine {
 
         // ']'
         if (isSymbolEqual(_tokenizer.getCurrentToken(), "]")){
+          //EDIT*
+
+          writePush(varName)
+          writeVmCommand("add")
+          writeVmCommand("pop pointer 1")
+          writeVmCommand("push that 0")
           eatCurrentToken()
 
           writeClosingTag(tag)
@@ -703,7 +912,7 @@ class CompilationEngine {
       // TODO: throw? expected expression']'
       return false
     }
-    /*  subroutineCall => (className|varName)'.'subroutineName'('expressionList')'  */
+    /*  subroutineCall => (className|varName)'.'subroutineName'('expressionList')'  */ //DONE
     else if(isIdentifier(currentToken) && isSymbolEqual(nextToken, ".")){
       writeOpeningTag(tag)
 
@@ -735,6 +944,10 @@ class CompilationEngine {
     else if (isIdentifier(currentToken)){
       writeOpeningTag(tag)
 
+      //*EDIT
+      val varName = currentToken.tokenValue
+      writePush(varName)
+
       eatCurrentToken()
 
       writeClosingTag(tag)
@@ -743,9 +956,9 @@ class CompilationEngine {
     }
     // '('expression')'
     else if (isSymbolEqual(currentToken, "(")){
-      writeOpeningTag(tag) // eat '('
+      writeOpeningTag(tag)
 
-      eatCurrentToken()
+      eatCurrentToken() // eat '('
 
       // expression
       if (compileExpression()){
@@ -768,11 +981,17 @@ class CompilationEngine {
     else if (isUnaryOp(currentToken)){
       writeOpeningTag(tag)
 
+      // *EDIT
+      val unaryOp = currentToken.tokenValue
+
       eatCurrentToken()
 
       // term
       if (compileTerm()){
         writeClosingTag(tag)
+
+        //*EDIT
+        writeUnaryOp(unaryOp)
 
         return true
       }
@@ -785,18 +1004,24 @@ class CompilationEngine {
     return false
   }
 
-  /*
+  /* DONE
    * Compiles a (possibly empty) comma-separated list of expressions.
    * (expression (',' expression)* )?
    */
-  def compileExpressionList():Boolean ={
+  def compileExpressionList():Int ={
     val tag = "expressionList"
     writeOpeningTag(tag)
 
+    //*EDIT
+    var expCount = 0
+
     // expression
     if (compileExpression()){
+      //*EDIT
+      expCount += 1
 
       // (',' expression)*
+      //region while (isSymbolEqual(_tokenizer.getCurrentToken(), ",")){ ... }
       while (isSymbolEqual(_tokenizer.getCurrentToken(), ",")){
         eatCurrentToken() // eat ','
 
@@ -804,17 +1029,21 @@ class CompilationEngine {
           writeClosingTag(tag)
 
           // TODO: throw? expected expression after ','
-          return false
+          return -1
         }
+
+        //*EDIT
+        expCount += 1
       }
+      //endregion
     }
 
     writeClosingTag(tag)
 
-    return true
+    return expCount
   }
 
-  /*
+  /* DONE
    * Compiles a single statement
    * letStatement | ifStatement | whileStatement | doStatement | returnStatement
    */
@@ -826,7 +1055,7 @@ class CompilationEngine {
       compileReturn()
   }
 
-  /*
+  /* DONE
    * Compiles a subroutineCall.
    * subroutineName '(' expressionList ')' |
    * (className | varName)'.' subroutineName '(' expressionList ')'
@@ -837,17 +1066,35 @@ class CompilationEngine {
 
     // subroutineName | className | varName <=> identifier
     if (isIdentifier(_tokenizer.getCurrentToken())){
-      eatCurrentToken()
+
+      //region *EDIT
+
+      val identifier = _tokenizer.getCurrentTokenValue()
+      var argsCount = 0
+
+      //endregion
+
+      eatCurrentToken() // eat identifier
 
       // '(' => subroutineName '(' expressionList')'
       if (isSymbolEqual(_tokenizer.getCurrentToken(), "(")){
         eatCurrentToken()
 
+        //region *EDIT
+        writeVmCommand("push pointer 0")
+        argsCount += compileExpressionList()
+        argsCount += 1
+
+        //endregion
+
         // expressionList
-        if (compileExpressionList()){
+        if (argsCount != -1){
 
           // ')'
           if (isSymbolEqual(_tokenizer.getCurrentToken(), ")")){
+            //*EDIT
+            writeCall(generateFullSubName(identifier), argsCount)
+
             eatCurrentToken()
 
             return true
@@ -860,6 +1107,17 @@ class CompilationEngine {
 
         // subroutineName
         if (isIdentifier(_tokenizer.getCurrentToken())){
+
+          //region *EDIT
+          val isVar = isVarName(identifier)
+          if (isVar){
+            writePush(identifier)
+            argsCount += 1
+          }
+          val subName = _tokenizer.getCurrentTokenValue()
+
+          //endregion
+
           eatCurrentToken()
 
           // '('
@@ -867,10 +1125,25 @@ class CompilationEngine {
             eatCurrentToken()
 
             // expressionList
-            if (compileExpressionList()){
+            //*EDIT
+            argsCount += compileExpressionList()
+
+            if (argsCount >= 0){
 
               // ')'
               if (isSymbolEqual(_tokenizer.getCurrentToken(), ")")){
+
+                //region *EDIT
+
+                if(isVar){
+                  writeCall(_symbolTable.typeOf(identifier) + "." + subName, argsCount)
+                }
+                else{
+                  writeCall(identifier + "." + subName, argsCount)
+                }
+
+                //endregion
+
                 eatCurrentToken()
 
                 return true
@@ -891,10 +1164,18 @@ class CompilationEngine {
    * Writes the current token to the output file, and advances the tokenizer.
    */
   private def eatCurrentToken(): Unit ={
+
+    //*EDIT
+    if (!_isXml){
+      _tokenizer.advance()
+
+      return
+    }
+
     val writer = new FileWriter(_outputFileUrl, true)
 
     var i = 0;
-    while (i < _tabsCount * 2){
+    while (i < _currentIndentLevel * 2){
       writer.write(' ')
 
       i += 1
@@ -1054,10 +1335,16 @@ class CompilationEngine {
   }
 
   private def writeOpeningTag(str:String): Unit ={
+
+    //*EDIT
+    if (!_isXml){
+      return
+    }
+
     val writer = new FileWriter(_outputFileUrl, true)
 
     var i = 0
-    while(i < _tabsCount * 2){
+    while(i < _currentIndentLevel * 2){
       writer.write(' ')
 
       i += 1
@@ -1066,16 +1353,22 @@ class CompilationEngine {
     writer.write("<" + str + ">\n")
     writer.close()
 
-    _tabsCount += 1
+    _currentIndentLevel += 1
   }
 
   private def writeClosingTag(str:String): Unit ={
-    _tabsCount -= 1
+
+    //*EDIT
+    if (!_isXml){
+      return
+    }
+
+    _currentIndentLevel -= 1
 
     val writer = new FileWriter(_outputFileUrl, true)
 
     var i = 0
-    while(i < _tabsCount * 2){
+    while(i < _currentIndentLevel * 2){
       writer.write(' ')
 
       i += 1
@@ -1085,5 +1378,336 @@ class CompilationEngine {
     writer.close()
 
   }
+
+  private def writeVmCommand(command:String): Unit ={
+    val writer = new FileWriter(_outputFileUrl, true)
+
+    //TODO: Delete before deploy
+    _cmdsCount += 1
+    if (_cmdsCount == 37 && _outputFileName.endsWith("Main")){
+      val x = 5
+    }
+
+
+    writer.write(command + '\n')
+
+    writer.close()
+  }
+
+  private def writeLabel(labelName:String): Unit ={
+    writeVmCommand("label " + labelName)
+  }
+
+  private def writePush(identifier:String): Unit ={
+    if (_symbolTable.kindOf(identifier) == VarKind.NONE){
+      //TODO: throw?
+      val x = 5
+    }
+
+    writeVmCommand("push " + _symbolTable.kindOf(identifier) + " " + _symbolTable.indexOf(identifier))
+  }
+
+  private def writePushConst(num:String): Unit ={
+    writeVmCommand("push constant " + num.toString)
+  }
+
+  private def writePushConst(num:Int): Unit ={
+    writeVmCommand("push constant " + num)
+  }
+
+  private def writePop(identifier:String): Unit ={
+    if (_symbolTable.kindOf(identifier) == VarKind.NONE){
+      //TODO: throw?
+    }
+
+    writeVmCommand("pop " + _symbolTable.kindOf(identifier) + " " + _symbolTable.indexOf(identifier))
+  }
+
+  private def writeOp(op:String): Unit = {
+    writeVmCommand(getVmOpCommand(op))
+  }
+
+  private def writeUnaryOp(unaryOp:String): Unit ={
+    writeVmCommand(getVmUnaryOpCommand(unaryOp))
+  }
+
+  private def writeCall(subName:String, argsCount:Int): Unit ={
+    writeVmCommand("call " + subName + " " + argsCount)
+  }
+
+  private def writeAdd(){
+    writeVmCommand("add")
+  }
+
+  private def generateFullSubName(subName:String):String ={
+    return _outputFileName + "." + subName
+  }
+
+  private def generateLabel(labelKind:LabelKind): String ={
+    var result = labelKind.toString + _labelsCount(labelKind).toString
+
+    _labelsCount(labelKind) += 1
+
+    return result
+  }
+
+  private def getVmOpCommand(operator:String):String ={
+
+    if (operator == "+") {
+      return "add"
+    }
+    else if (operator == "-") {
+      return "sub"
+    }
+    else if (operator == "*") {
+      return "call Math.multiply 2"
+    }
+    else if (operator == "/") {
+      return "call Math.divide 2"
+    }
+    else if (operator == "&amp;") {
+      return "and"
+    }
+    else if (operator == "|") {
+      return "or"
+    }
+    else if (operator == "&lt;") {
+      return "lt"
+    }
+    else if (operator == "&gt;") {
+      return "gt"
+    }
+    else if (operator == "=") {
+      return "eq"
+    }
+    else {
+      throw new AssertionError();
+    }
+  }
+
+  private def getVmUnaryOpCommand(unaryOp:String):String ={
+
+    if (unaryOp == "-"){
+      return "neg"
+    }
+
+    //if "~"
+    return "not"
+  }
+
+  private def isVarName(identifier:String):Boolean ={
+    return _symbolTable.kindOf(identifier) != VarKind.NONE
+  }
+
+  private def resetSubroutine(): Unit ={
+    _symbolTable.startSubroutine()
+    LabelKind.values.foreach(labelKind => {
+      _labelsCount(labelKind) = 0
+    })
+  }
+
+
+  //TODO: Dell all below?
+  //region DELETE?!
+
+  private def codeWrite(exp:ListBuffer[String]): Unit ={
+    if (exp.length == 0) {
+      return
+    }
+
+    if (exp.length == 1){
+
+      val tok = exp(0)
+
+      if (Util.isInt(tok)){
+        writeVmCommand("push " + tok)
+      }
+      else if (isVariable(tok)){
+        writeVmCommand("push " + tok)
+      }
+    }
+    else if (exp.length > 1){
+      if (isExpOpExp(exp)){
+        val exp1 = getExp1(exp)
+        val exp2 = getExp2(exp)
+        val op = getOp(exp)
+
+        codeWrite(exp1)
+        codeWrite(exp2)
+
+        writeVmCommand(getVmOpCommand(op))
+      }
+      else if (isOpExp(exp)){
+        val exp1 = getExp(exp)
+        val op = getOp(exp)
+
+        codeWrite(exp1)
+        writeVmCommand(op)
+      }
+      else if (isFunction(exp)){
+        val exps = getExps(exp)
+        val fName = getFuncName(exp)
+
+        exps.foreach(xp => {
+          codeWrite(xp)
+        })
+
+        writeVmCommand("call " + fName)
+      }
+    }
+  }
+
+  // determines if an expression is of the pattern "exp1 op exp2"
+  def isExpOpExp(exp:ListBuffer[String]): Boolean ={
+    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
+
+    var i = 0
+    exp.foreach(tok => {
+      if (ops.contains(tok)){
+        if (i - 1 >= 0 && i + 1 < exp.length){
+          return true
+        }
+        else{
+          return false
+        }
+      }
+
+      i += 1
+    })
+
+    return false;
+  }
+
+  // get exp1 out of exp = exp1 op exp2
+  def getExp1(exp:ListBuffer[String]): ListBuffer[String] ={
+    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
+
+    var i = 0
+    exp.foreach(tok => {
+      if (ops.contains(tok)){
+        if (i - 1 >= 0 && i + 1 < exp.length){
+          return exp.slice(0, i)
+        }
+      }
+
+      i += 1
+    })
+
+    return null.asInstanceOf[ListBuffer[String]]
+  }
+
+  // get exp2 out of exp = exp1 op exp2
+  def getExp2(exp:ListBuffer[String]): ListBuffer[String] ={
+    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
+
+    var i = 0
+    exp.foreach(c => {
+      if (ops.contains(c.toString)){
+        if (i - 1 >= 0 && i + 1 < exp.length){
+          return exp.slice(i + 1, exp.length)
+        }
+      }
+
+      i += 1
+    })
+
+    return null.asInstanceOf[ListBuffer[String]]
+  }
+
+  // get op out of exp = exp1* op exp2
+  def getOp(exp:ListBuffer[String]): String ={
+    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
+
+    var i = 0
+    exp.foreach(c => {
+      if (ops.contains(c.toString)){
+        if (i + 1 < exp.length){
+          return c
+        }
+      }
+
+      i += 1
+    })
+
+    return null.asInstanceOf[String]
+  }
+
+  // determines if an expression is of the pattern "op exp2"
+  def isOpExp(exp:ListBuffer[String]):Boolean ={
+    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
+
+    var i = 0
+    exp.foreach(tok => {
+      if (ops.contains(tok)){
+        if (i - 1 < 0 && i + 1 < exp.length){
+          return true
+        }
+        else{
+          return false
+        }
+      }
+
+      i += 1
+    })
+
+    return false;
+  }
+
+  // get exp2 out of exp = op exp2
+  def getExp(exp:ListBuffer[String]):ListBuffer[String] ={
+    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
+
+    var i = 0
+    exp.foreach(c => {
+      if (ops.contains(c.toString)){
+        if (i - 1 < 0 && i + 1 < exp.length){
+          return exp.slice(i + 1, exp.length)
+        }
+        else{
+          return null.asInstanceOf[ListBuffer[String]]
+        }
+      }
+
+      i += 1
+    })
+
+    return null.asInstanceOf[ListBuffer[String]];
+  }
+
+  //((type varName) (',' type varName)*)?
+  // determines if an expression is of the pattern "f(exp1, exp2, ...)"
+  def isFunction(exp:ListBuffer[String]):Boolean ={
+    val pattern = "^[a-zA-Z_][\\w_]*\\(()?\\)"
+
+    return false
+  }
+
+  def getExps(exp:ListBuffer[String]):ListBuffer[ListBuffer[String]] ={
+    return new ListBuffer[ListBuffer[String]]()
+  }
+
+  def getFuncName(exp:ListBuffer[String]):String ={
+    return ""
+  }
+
+  // determines if an expression is a variable
+  private def isVariable(exp:String): Boolean ={
+
+    return false; //TODO: Implement
+  }
+
+  //endregion
+
+}
+
+object LabelKind extends Enumeration {
+  type LabelKind = Value
+
+  // Assigning values
+  val IF_TRUE = Value("IF_TRUE")
+  val IF_FALSE = Value("IF_FALSE")
+  val IF_END = Value("IF_END")
+  val WHILE_EXP = Value("WHILE_EXP")
+  val WHILE_END = Value("WHILE_END")
 }
 

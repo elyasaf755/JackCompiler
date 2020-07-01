@@ -10,8 +10,6 @@ object VMTranslatorMain {
       inputUrl += arg
     })
 
-    inputUrl += "\\"
-
     val f = new File(inputUrl)
 
     if (f.isDirectory){
@@ -24,12 +22,12 @@ object VMTranslatorMain {
         generateCode(outputFile, new Parser(file.getPath), true)
       })
     }
-    else if (f.isFile){
+    else if (f.isFile && f.getName.endsWith(".vm")){
       val outputPath = f.getPath
       generateCode(outputPath, new Parser(outputPath), false)
     }
     else{
-      throw new Exception("Input path isn't a file nor directory")
+      throw new Exception("The input path isn't a .vm file nor directory containing .vm files")
     }
   }
 

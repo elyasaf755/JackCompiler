@@ -1,4 +1,7 @@
-import Kind.Kind
+package JackAnalyzer
+
+import JackAnalyzer.VarKind.VarKind
+import Models.{Identifier}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -7,14 +10,14 @@ class SymbolTable {
 
   /* Private Fields */
 
-  private var _classTable = new ListBuffer[Identifier]
-  private var _subroutineTable = new ListBuffer[Identifier]
+  private var _classTable = new ListBuffer[Identifier]()
+  private var _subroutineTable = new ListBuffer[Identifier]()
 
-  private val _varCounts:mutable.HashMap[Kind, Int] = mutable.HashMap(
-    Kind.STATIC -> 0,
-    Kind.FIELD -> 0,
-    Kind.ARG -> 0,
-    Kind.VAR -> 0,
+  private val _varCounts:mutable.HashMap[VarKind, Int] = mutable.HashMap(
+    VarKind.STATIC -> 0,
+    VarKind.FIELD -> 0,
+    VarKind.ARG -> 0,
+    VarKind.VAR -> 0,
   )
 
 
@@ -25,7 +28,13 @@ class SymbolTable {
    * (i.e - resets the subroutine's symbol table)
    */
   def startSubroutine(): Unit ={
+    _subroutineTable.clear()
 
+    val vars = List(VarKind.ARG, VarKind.VAR)
+
+    vars.foreach(v =>{
+      _varCounts(v) = 0
+    })
   }
 
   /*
@@ -34,13 +43,13 @@ class SymbolTable {
    * STATIC & FIELD  identifiers have a class scope,
    * while ARG & VAR identifiers have a subroutine scope.
    */
-  def define(name:String, identifierType:String, kind:Kind):Unit ={
+  def define(name:String, identifierType:String, kind:VarKind):Unit ={
 
-    if (Set(Kind.STATIC, Kind.FIELD).contains(kind)){
+    if (Set(VarKind.STATIC, VarKind.FIELD).contains(kind)){
       _classTable.addOne(new Identifier(name, identifierType, kind, getVarCount(kind)))
       incKindCount(kind)
     }
-    else if (Set(Kind.ARG, Kind.VAR).contains(kind)){
+    else if (Set(VarKind.ARG, VarKind.VAR).contains(kind)){
       _subroutineTable.addOne(new Identifier(name, identifierType, kind, getVarCount(kind)))
       incKindCount(kind)
     }
@@ -51,7 +60,7 @@ class SymbolTable {
    * Returns the number of variables of the given kind
    * already defines in the current scope
    */
-  def getVarCount(kind:Kind): Int ={
+  def getVarCount(kind:VarKind): Int ={
     return _varCounts(kind)
   }
 
@@ -59,7 +68,7 @@ class SymbolTable {
    * Returns the kind of the named identifier in the current scope.
    * If the identifier if unknown in the current scope, returns NONE.
    */
-  def kindOf(name:String):Kind ={
+  def kindOf(name:String):VarKind ={
 
     // first look up the subroutine table
     _subroutineTable.foreach(identifier => {
@@ -76,7 +85,7 @@ class SymbolTable {
     })
 
     // return NONE if name wasn't found in both tables
-    return Kind.NONE
+    return VarKind.NONE
   }
 
   /*
@@ -130,59 +139,18 @@ class SymbolTable {
   /*
    * Increment the current number of given kind in the symbol table by 1
    */
-  private def incKindCount(kind:Kind): Unit ={
+  private def incKindCount(kind:VarKind): Unit ={
     _varCounts(kind) += 1
   }
 }
 
-class Identifier {
-
-  /* Private Fields */
-
-  private var _name:String = _
-  private var _identifierType:String = _
-  private var _kind:Kind = _
-  private var _index:Int = _
-
-
-  /* Constructor */
-
-  def this(name:String, identifierType:String, kind:Kind, index:Int){
-    this()
-
-    _name = name
-    _identifierType = identifierType
-    _kind = kind
-    _index = index
-  }
-
-
-  /* Methods */
-
-  def getName(): String ={
-    return _name
-  }
-
-  def getType(): String ={
-    return _identifierType
-  }
-
-  def getKind(): Kind ={
-    return _kind
-  }
-
-  def getIndex(): Int ={
-    return _index
-  }
-}
-
-object Kind extends Enumeration {
-  type Kind = Value
+object VarKind extends Enumeration {
+  type VarKind = Value
 
   // Assigning values
   val STATIC = Value("static")
-  val FIELD = Value("field")
-  val ARG = Value("arg")
-  val VAR = Value("var")
+  val FIELD = Value("this")
+  val ARG = Value("argument")
+  val VAR = Value("local")
   val NONE = Value("none")
 }

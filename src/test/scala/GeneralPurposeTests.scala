@@ -1,4 +1,6 @@
-import Kind.Kind
+import JackAnalyzer.VarKind
+import JackAnalyzer.VarKind.VarKind
+import Modules.JackAnalyzerClasses.LabelKind
 import org.scalatest.FunSuite
 
 import scala.collection.mutable
@@ -6,22 +8,36 @@ import scala.collection.mutable
 class GeneralPurposeTests extends FunSuite{
   test("EnumsValues"){
 
-    assert(Set(Kind.STATIC, Kind.FIELD).subsetOf(Kind.values))
+    assert(Set(VarKind.STATIC, VarKind.FIELD).subsetOf(VarKind.values))
 
-    assert(!Set(Kind.ARG, Kind.VAR).subsetOf(Set(Kind.STATIC, Kind.FIELD)))
+    assert(!Set(VarKind.ARG, VarKind.VAR).subsetOf(Set(VarKind.STATIC, VarKind.FIELD)))
 
-    assert(Set(Kind.ARG, Kind.VAR).contains(Kind.ARG))
+    assert(Set(VarKind.ARG, VarKind.VAR).contains(VarKind.ARG))
   }
 
   test("HashMap"){
-    var _hMap = new mutable.HashMap[Kind,Int]()
+    var _hMap = new mutable.HashMap[VarKind,Int]()
     println(_hMap)
 
-    _hMap += (Kind.ARG -> 0)
+    _hMap += (VarKind.ARG -> 0)
     println(_hMap)
 
-    println(_hMap(Kind.ARG))
-    _hMap(Kind.ARG) += 1
+    println(_hMap(VarKind.ARG))
+    _hMap(VarKind.ARG) += 1
     println(_hMap)
+  }
+
+  test("Chars"){
+    assert('H'.toInt == 72)
+  }
+
+  test("functions"){
+    var x = 5
+    var b = foo()
+    assert(b == 5)
+  }
+
+  private def foo(): Int ={
+    return 5
   }
 }

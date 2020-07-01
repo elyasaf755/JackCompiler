@@ -156,6 +156,13 @@ class JackTokenizer {
   }
 
   /*
+   * Returns the value of the current token
+   */
+  def getCurrentTokenValue():String ={
+    return _currentToken.tokenValue
+  }
+
+  /*
    * Returns the tokens list
    */
   def getTokens():ListBuffer[Token] ={
