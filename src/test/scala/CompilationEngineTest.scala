@@ -9,10 +9,63 @@ import sys.process._
 import scala.language.postfixOps
 
 class CompilationEngineTest extends FunSuite{
-  var _i:Int = _
+  private var _i:Int = _
 
-  /* Tests */
+  private var _compareMode = true
 
+  /* Project 11 Tests */
+
+  test("Seven"){
+    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\Seven"
+    compile(dirUrl)
+
+    assert(compare(dirUrl))
+  }
+
+  test("ConvertToBin"){
+    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\ConvertToBin"
+    compile(dirUrl)
+
+    assert(compare(dirUrl))
+  }
+
+  test("Square"){
+    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\Square"
+    compile(dirUrl)
+
+    assert(compare(dirUrl))
+  }
+
+  test("Pong"){
+    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\Pong"
+    compile(dirUrl)
+
+    assert(compare(dirUrl))
+  }
+
+  test("Average"){
+    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\Average"
+    compile(dirUrl)
+
+    assert(compare(dirUrl))
+  }
+
+  test("ComplexArrays"){
+    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\ComplexArrays"
+    compile(dirUrl)
+
+    assert(compare(dirUrl))
+  }
+
+  test("Snake"){
+    val dirUrl = "C:\\Users\\elyas\\Desktop\\Studies\\Snake"
+    compile(dirUrl)
+
+    assert(compare(dirUrl))
+  }
+
+  /* Project 10 Tests */
+  /*
   test("GeneralPurposeTests"){
     val url = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestSourceFiles"
 
@@ -106,94 +159,8 @@ class CompilationEngineTest extends FunSuite{
     assert(isSymbolEqual(token, ';'))
   }
 
+   */
 
-  test("Seven"){
-    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\Seven"
-    compile(dirUrl)
-
-    assert(compare(dirUrl))
-  }
-
-  test("ConvertToBin"){
-    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\ConvertToBin"
-    compile(dirUrl)
-
-    assert(compare(dirUrl))
-  }
-
-  test("Square"){
-    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\Square"
-    compile(dirUrl)
-
-    assert(compare(dirUrl))
-  }
-
-  test("Pong"){
-    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\Pong"
-    compile(dirUrl)
-
-    assert(compare(dirUrl))
-  }
-
-  test("Average"){
-    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\Average"
-    compile(dirUrl)
-
-    assert(compare(dirUrl))
-  }
-
-  test("ComplexArrays"){
-    val dirUrl = "C:\\Users\\elyas\\IdeaProjects\\JackCompiler\\src\\test\\TestFiles\\ComplexArrays"
-    compile(dirUrl)
-
-    assert(compare(dirUrl))
-  }
-
-
-  test("CompilationEngine.isExpOpExp"){
-    assert(new CompilationEngine().isExpOpExp(ListBuffer("a", "+", "bc", "*", "d")))
-    assert(!new CompilationEngine().isExpOpExp(ListBuffer("+", "bc", "*", "d")))
-    assert(!new CompilationEngine().isExpOpExp(ListBuffer("a", "+")))
-    assert(!new CompilationEngine().isExpOpExp(ListBuffer("a", "*")))
-    assert(!new CompilationEngine().isExpOpExp(ListBuffer("*", "a")))
-    assert(!new CompilationEngine().isExpOpExp(ListBuffer("*")))
-    assert(!new CompilationEngine().isExpOpExp(ListBuffer("a")))
-  }
-
-  test("CompilationEngine.getExp1"){
-    assert(new CompilationEngine().getExp1(ListBuffer("a", "+", "bc", "*", "d")) == ListBuffer("a"))
-    assert(new CompilationEngine().getExp1(ListBuffer("+", "bc", "*", "d")) == null.asInstanceOf[ListBuffer[String]])
-    assert(new CompilationEngine().getExp1(ListBuffer("-", "bc", "*", "d")) == null.asInstanceOf[ListBuffer[String]])
-    assert(new CompilationEngine().getExp1(ListBuffer("a", "+")) == null.asInstanceOf[ListBuffer[String]])
-  }
-
-  test("CompilationEngine.getExp2"){
-    assert(new CompilationEngine().getExp1(ListBuffer("a", "+", "bc", "*", "d")) == ListBuffer("bc", "*", "d"))
-    assert(new CompilationEngine().getExp1(ListBuffer("+", "bc", "*", "d")) == ListBuffer("bc", "*", "d"))
-    assert(new CompilationEngine().getExp1(ListBuffer("a", "+")) == null.asInstanceOf[ListBuffer[String]])
-  }
-
-  test("CompilationEngine.getOp"){
-    assert(new CompilationEngine().getOp(ListBuffer("a", "+", "bc", "*", "d")) == "+")
-    assert(new CompilationEngine().getOp(ListBuffer("+", "bc", "*", "d")) == "+")
-    assert(new CompilationEngine().getOp(ListBuffer("bc", "+")) == null.asInstanceOf[String])
-  }
-
-  test("CompilationEngine.isOpExp"){
-    assert(!new CompilationEngine().isOpExp(ListBuffer("a", "+", "bc", "*", "d")))
-    assert(new CompilationEngine().isOpExp(ListBuffer("+", "bc", "*", "d")))
-    assert(!new CompilationEngine().isOpExp(ListBuffer("a", "+")))
-    assert(!new CompilationEngine().isOpExp(ListBuffer("a", "*")))
-    assert(new CompilationEngine().isOpExp(ListBuffer("*", "a")))
-    assert(!new CompilationEngine().isOpExp(ListBuffer("*")))
-    assert(!new CompilationEngine().isOpExp(ListBuffer("a")))
-  }
-
-  test("CompilationEngine.getExp"){
-    assert(new CompilationEngine().getExp(ListBuffer("a", "+", "bc", "*", "d")) == null.asInstanceOf[String])
-    assert(new CompilationEngine().getExp(ListBuffer("+", "bc", "*", "d")) == ListBuffer("bc", "*", "d"))
-    assert(new CompilationEngine().getExp(ListBuffer("a", "+")) == null.asInstanceOf[ListBuffer[String]])
-  }
 
 
   /* Private Helper Methods */
@@ -260,8 +227,36 @@ class CompilationEngineTest extends FunSuite{
 
     if (f.isDirectory){
       Util.getFilesFromDir(inputUrl,  "jack").foreach(file => {
-        val inputFileUrl = file.getPath
-        val outputFileUrl = inputFileUrl.replace(file.getName, "MY" + file.getName).replace(".jack", ".vm")
+        if (_compareMode){
+          val inputFileUrl = file.getPath
+          val outputFileUrl = inputFileUrl.replace(file.getName, "MY" + file.getName).replace(".jack", ".vm")
+          val tokenizer = new JackTokenizer(inputFileUrl)
+
+          // clears the current contents of the output file, if any
+          Util.clearFile(outputFileUrl)
+
+          val compilationEngine = new CompilationEngine(tokenizer, outputFileUrl)
+
+          compilationEngine.compileClass()
+        }
+        else{
+          val inputFileUrl = file.getPath
+          val outputFileUrl = inputFileUrl.replace(".jack", ".vm")
+          val tokenizer = new JackTokenizer(inputFileUrl)
+
+          // clears the current contents of the output file, if any
+          Util.clearFile(outputFileUrl)
+
+          val compilationEngine = new CompilationEngine(tokenizer, outputFileUrl)
+
+          compilationEngine.compileClass()
+        }
+      })
+    }
+    else if (f.isFile && f.getName.endsWith(".jack")){
+      if (_compareMode){
+        val inputFileUrl = f.getPath
+        val outputFileUrl = inputFileUrl.replace(f.getName, "MY" + f.getName).replace(".jack", ".vm")
         val tokenizer = new JackTokenizer(inputFileUrl)
 
         // clears the current contents of the output file, if any
@@ -270,19 +265,19 @@ class CompilationEngineTest extends FunSuite{
         val compilationEngine = new CompilationEngine(tokenizer, outputFileUrl)
 
         compilationEngine.compileClass()
-      })
-    }
-    else if (f.isFile && f.getName.endsWith(".jack")){
-      val inputFileUrl = f.getPath
-      val outputFileUrl = inputFileUrl.replace(".jack", ".vm")
-      val tokenizer = new JackTokenizer(inputFileUrl)
+      }
+      else{
+        val inputFileUrl = f.getPath
+        val outputFileUrl = inputFileUrl.replace(".jack", ".vm")
+        val tokenizer = new JackTokenizer(inputFileUrl)
 
-      // clears the current contents of the output file, if any
-      Util.clearFile(outputFileUrl)
+        // clears the current contents of the output file, if any
+        Util.clearFile(outputFileUrl)
 
-      val compilationEngine = new CompilationEngine(tokenizer, outputFileUrl)
+        val compilationEngine = new CompilationEngine(tokenizer, outputFileUrl)
 
-      compilationEngine.compileClass()
+        compilationEngine.compileClass()
+      }
     }
     else{
       throw new Exception("Input path isn't a .jack file nor directory containing .jack files")
@@ -290,6 +285,10 @@ class CompilationEngineTest extends FunSuite{
   }
 
   private def compare(inputUrl:String):Boolean ={
+    if (!_compareMode){
+      return true
+    }
+
     val f = new File(inputUrl)
     val pythonScriptDirUrl = "C:\\Users\\elyas\\Documents\\Visual Studio Projects\\TextComparerHelper\\TextComparerHelper"
 

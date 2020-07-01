@@ -799,7 +799,7 @@ class CompilationEngine {
           }
 
           //*EDIT
-          writeVmCommand(getVmOpCommand(op))
+          writeOp(op)
         }
         //endregion
 
@@ -896,7 +896,7 @@ class CompilationEngine {
           //EDIT*
 
           writePush(varName)
-          writeVmCommand("add")
+          writeAdd()
           writeVmCommand("pop pointer 1")
           writeVmCommand("push that 0")
           eatCurrentToken()
@@ -1415,14 +1415,6 @@ class CompilationEngine {
     writeVmCommand("push constant " + num)
   }
 
-  private def writePop(identifier:String): Unit ={
-    if (_symbolTable.kindOf(identifier) == VarKind.NONE){
-      //TODO: throw?
-    }
-
-    writeVmCommand("pop " + _symbolTable.kindOf(identifier) + " " + _symbolTable.indexOf(identifier))
-  }
-
   private def writeOp(op:String): Unit = {
     writeVmCommand(getVmOpCommand(op))
   }
@@ -1505,198 +1497,6 @@ class CompilationEngine {
       _labelsCount(labelKind) = 0
     })
   }
-
-
-  //TODO: Dell all below?
-  //region DELETE?!
-
-  private def codeWrite(exp:ListBuffer[String]): Unit ={
-    if (exp.length == 0) {
-      return
-    }
-
-    if (exp.length == 1){
-
-      val tok = exp(0)
-
-      if (Util.isInt(tok)){
-        writeVmCommand("push " + tok)
-      }
-      else if (isVariable(tok)){
-        writeVmCommand("push " + tok)
-      }
-    }
-    else if (exp.length > 1){
-      if (isExpOpExp(exp)){
-        val exp1 = getExp1(exp)
-        val exp2 = getExp2(exp)
-        val op = getOp(exp)
-
-        codeWrite(exp1)
-        codeWrite(exp2)
-
-        writeVmCommand(getVmOpCommand(op))
-      }
-      else if (isOpExp(exp)){
-        val exp1 = getExp(exp)
-        val op = getOp(exp)
-
-        codeWrite(exp1)
-        writeVmCommand(op)
-      }
-      else if (isFunction(exp)){
-        val exps = getExps(exp)
-        val fName = getFuncName(exp)
-
-        exps.foreach(xp => {
-          codeWrite(xp)
-        })
-
-        writeVmCommand("call " + fName)
-      }
-    }
-  }
-
-  // determines if an expression is of the pattern "exp1 op exp2"
-  def isExpOpExp(exp:ListBuffer[String]): Boolean ={
-    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
-
-    var i = 0
-    exp.foreach(tok => {
-      if (ops.contains(tok)){
-        if (i - 1 >= 0 && i + 1 < exp.length){
-          return true
-        }
-        else{
-          return false
-        }
-      }
-
-      i += 1
-    })
-
-    return false;
-  }
-
-  // get exp1 out of exp = exp1 op exp2
-  def getExp1(exp:ListBuffer[String]): ListBuffer[String] ={
-    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
-
-    var i = 0
-    exp.foreach(tok => {
-      if (ops.contains(tok)){
-        if (i - 1 >= 0 && i + 1 < exp.length){
-          return exp.slice(0, i)
-        }
-      }
-
-      i += 1
-    })
-
-    return null.asInstanceOf[ListBuffer[String]]
-  }
-
-  // get exp2 out of exp = exp1 op exp2
-  def getExp2(exp:ListBuffer[String]): ListBuffer[String] ={
-    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
-
-    var i = 0
-    exp.foreach(c => {
-      if (ops.contains(c.toString)){
-        if (i - 1 >= 0 && i + 1 < exp.length){
-          return exp.slice(i + 1, exp.length)
-        }
-      }
-
-      i += 1
-    })
-
-    return null.asInstanceOf[ListBuffer[String]]
-  }
-
-  // get op out of exp = exp1* op exp2
-  def getOp(exp:ListBuffer[String]): String ={
-    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
-
-    var i = 0
-    exp.foreach(c => {
-      if (ops.contains(c.toString)){
-        if (i + 1 < exp.length){
-          return c
-        }
-      }
-
-      i += 1
-    })
-
-    return null.asInstanceOf[String]
-  }
-
-  // determines if an expression is of the pattern "op exp2"
-  def isOpExp(exp:ListBuffer[String]):Boolean ={
-    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
-
-    var i = 0
-    exp.foreach(tok => {
-      if (ops.contains(tok)){
-        if (i - 1 < 0 && i + 1 < exp.length){
-          return true
-        }
-        else{
-          return false
-        }
-      }
-
-      i += 1
-    })
-
-    return false;
-  }
-
-  // get exp2 out of exp = op exp2
-  def getExp(exp:ListBuffer[String]):ListBuffer[String] ={
-    val ops = List("+", "-", "*", "/", "&amp;", "|", "&lt;", "&gt;", "=")
-
-    var i = 0
-    exp.foreach(c => {
-      if (ops.contains(c.toString)){
-        if (i - 1 < 0 && i + 1 < exp.length){
-          return exp.slice(i + 1, exp.length)
-        }
-        else{
-          return null.asInstanceOf[ListBuffer[String]]
-        }
-      }
-
-      i += 1
-    })
-
-    return null.asInstanceOf[ListBuffer[String]];
-  }
-
-  //((type varName) (',' type varName)*)?
-  // determines if an expression is of the pattern "f(exp1, exp2, ...)"
-  def isFunction(exp:ListBuffer[String]):Boolean ={
-    val pattern = "^[a-zA-Z_][\\w_]*\\(()?\\)"
-
-    return false
-  }
-
-  def getExps(exp:ListBuffer[String]):ListBuffer[ListBuffer[String]] ={
-    return new ListBuffer[ListBuffer[String]]()
-  }
-
-  def getFuncName(exp:ListBuffer[String]):String ={
-    return ""
-  }
-
-  // determines if an expression is a variable
-  private def isVariable(exp:String): Boolean ={
-
-    return false; //TODO: Implement
-  }
-
-  //endregion
 
 }
 
